@@ -34,9 +34,9 @@ jobs:
 
     - name: Verify production readiness
       run: |
-        # Check if main application file exists
-        if [ ! -f "app.js" ] && [ ! -f "server.js" ] && [ ! -f "index.js" ]; then
-          echo "❌ No main application file found (app.js, server.js, or index.js)"
+        # Check if main application file exists (only server.js)
+        if [ ! -f "server.js" ]; then
+          echo "❌ No main application file found (server.js)"
           exit 1
         fi
         
