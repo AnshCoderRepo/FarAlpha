@@ -16,8 +16,17 @@ jobs:
         with:
           node-version: "18"
 
-      - name: Install dependencies (CI)
+      - name: Install dependencies
         run: npm ci --production
+
+      - name: Validate application
+        run: |
+          # Check if app.js exists and is valid
+          if [ ! -f "app.js" ]; then
+            echo "❌ app.js not found!"
+            exit 1
+          fi
+          node -c app.js && echo "✅ App syntax is valid"
 
       - name: Prepare SSH
         env:
@@ -26,41 +35,75 @@ jobs:
           VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "$VM_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 700 ~/.ssh
+          
+          # Write the SSH key with proper formatting
+          echo "$VM_SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          
+          # Add known hosts
           ssh-keyscan -H "$VM_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          
+          # Test SSH connection
+          echo "Testing SSH connection..."
+          if ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "$VM_USER@$VM_HOST" "echo 'SSH connection successful!'"; then
+            echo "✅ SSH connection test passed"
+          else
+            echo "❌ SSH connection test failed"
+            echo "Key content (first 100 chars): $(head -c 100 ~/.ssh/id_rsa)"
+            exit 1
+          fi
 
       - name: Upload project via rsync
         env:
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
         run: |
-          rsync -avz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes" --exclude=node_modules --exclude=.git ./ "$VM_USER@$VM_HOST:/tmp/sayhello-node-ui"
+          echo "Uploading files to VM..."
+          rsync -avz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
+            --exclude=node_modules \
+            --exclude=.git \
+            --exclude=.github \
+            ./ "$VM_USER@$VM_HOST:/tmp/sayhello-node-ui/"
+          echo "✅ Files uploaded successfully"
 
       - name: Install and restart service
         env:
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
         run: |
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes "$VM_USER@$VM_HOST" 'bash -s' <<'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no "$VM_USER@$VM_HOST" 'bash -s' <<'EOF'
           set -euo pipefail
+          
+          # Create app directory
           sudo mkdir -p /opt/sayhello-node-ui
-          sudo rm -rf /opt/sayhello-node-ui/*
-          sudo cp -r /tmp/sayhello-node-ui/* /opt/sayhello-node-ui/
+          sudo chown $USER:$USER /opt/sayhello-node-ui
+          rm -rf /opt/sayhello-node-ui/*
+          
+          # Copy files
+          cp -r /tmp/sayhello-node-ui/* /opt/sayhello-node-ui/
           cd /opt/sayhello-node-ui
+          
+          # Install production dependencies
           npm install --production
-
+          
+          # Allow Node.js to bind to port 80
+          sudo setcap 'cap_net_bind_service=+ep' $(which node)
+          
+          # Create systemd service
           sudo tee /etc/systemd/system/sayhello-node-ui.service >/dev/null <<'UNIT'
           [Unit]
           Description=SayHello Node UI API
-          After=network-online.target
-          Wants=network-online.target
+          After=network.target
 
           [Service]
-          ExecStart=/usr/bin/node /opt/sayhello-node-ui/server.js
+          Type=simple
+          ExecStart=/usr/bin/node /opt/sayhello-node-ui/app.js
           Restart=always
-          RestartSec=2
-          User=root
+          RestartSec=3
+          User=$USER
+          Group=$USER
           WorkingDirectory=/opt/sayhello-node-ui
           Environment=NODE_ENV=production
 
@@ -68,13 +111,30 @@ jobs:
           WantedBy=multi-user.target
           UNIT
 
+          # Enable and start service
           sudo systemctl daemon-reload
-          sudo systemctl enable --now sayhello-node-ui.service
-
+          sudo systemctl enable sayhello-node-ui.service
+          sudo systemctl restart sayhello-node-ui.service
+          
+          # Allow port 80 if firewall is enabled
           if command -v ufw >/dev/null 2>&1; then
             sudo ufw allow 80/tcp || true
           fi
-
-          sleep 2
-          curl -fsS http://localhost/sayHello | grep -q '"Hello User"'
+          
+          # Verify service is running
+          sleep 3
+          if curl -fs http://localhost/sayHello | grep -q '"message":"Hello User."'; then
+            echo "✅ Service is running correctly"
+          else
+            echo "❌ Service failed to start"
+            sudo journalctl -u sayhello-node-ui.service -n 20 --no-pager
+            exit 1
+          fi
           EOF
+
+      - name: Verify remote deployment
+        run: |
+          echo "Testing remote endpoint..."
+          sleep 5
+          curl -f http://${{ secrets.VM_HOST }}/sayHello
+          echo "✅ Remote deployment verified successfully!"
