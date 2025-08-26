@@ -17,11 +17,11 @@ sudo npm start
 ## Deploy (high-level)
 1. Create a **private** GitHub repo and push this project.
 2. Add GitHub Secrets:
-   - `VM_HOST=40.76.97.198`
-   - `VM_USER=azureuser`
+   - `VM_HOST="Give your host"`
+   - `VM_USER="Give User "`
    - `VM_SSH_KEY=<private ssh key contents>`
 3. Push to `main` — Actions will rsync the project to the VM and install/start a `systemd` service.
-4. Test from any machine: `curl http://40.76.97.198/sayHello`
+4. Test from any machine: `curl Avaliable`
 
 ## Submission
 Fill `SUBMISSION.md` with your private repo link, exported ZIP, and notes.

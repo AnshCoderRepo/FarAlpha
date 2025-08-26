@@ -7,5 +7,5 @@
 ## Verification Steps
 1. Push to `main` (or merge a PR).
 2. In Actions → Deploy Node App to VM → confirm all steps pass.
-3. From any machine, run `curl http://40.76.97.198/sayHello`.
+3. From any machine, run `curl Avaliable`.
    - Expect: `{"message":"Hello User"}`.
