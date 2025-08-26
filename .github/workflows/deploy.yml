@@ -1,0 +1,80 @@
+# name: Deploy Node App to VM
+
+# on:
+#   push:
+#     branches: ["main"]
+
+# jobs:
+#   build-and-deploy:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: "18"
+
+#       - name: Install dependencies (CI)
+#         run: npm ci --production
+
+#       - name: Prepare SSH
+#         env:
+#           VM_HOST: ${{ secrets.VM_HOST }}
+#           VM_USER: ${{ secrets.VM_USER }}
+#           VM_SSH_KEY: ${{ secrets.VM_SSH_KEY }}
+#         run: |
+#           mkdir -p ~/.ssh
+#           echo "$VM_SSH_KEY" > ~/.ssh/id_rsa
+#           chmod 600 ~/.ssh/id_rsa
+#           ssh-keyscan -H "$VM_HOST" >> ~/.ssh/known_hosts
+
+#       - name: Upload project via rsync
+#         env:
+#           VM_HOST: ${{ secrets.VM_HOST }}
+#           VM_USER: ${{ secrets.VM_USER }}
+#         run: |
+#           rsync -avz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes" --exclude=node_modules --exclude=.git ./ "$VM_USER@$VM_HOST:/tmp/sayhello-node-ui"
+
+#       - name: Install and restart service
+#         env:
+#           VM_HOST: ${{ secrets.VM_HOST }}
+#           VM_USER: ${{ secrets.VM_USER }}
+#         run: |
+#           ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=yes "$VM_USER@$VM_HOST" 'bash -s' <<'EOF'
+#           set -euo pipefail
+#           sudo mkdir -p /opt/sayhello-node-ui
+#           sudo rm -rf /opt/sayhello-node-ui/*
+#           sudo cp -r /tmp/sayhello-node-ui/* /opt/sayhello-node-ui/
+#           cd /opt/sayhello-node-ui
+#           npm install --production
+
+#           sudo tee /etc/systemd/system/sayhello-node-ui.service >/dev/null <<'UNIT'
+#           [Unit]
+#           Description=SayHello Node UI API
+#           After=network-online.target
+#           Wants=network-online.target
+
+#           [Service]
+#           ExecStart=/usr/bin/node /opt/sayhello-node-ui/server.js
+#           Restart=always
+#           RestartSec=2
+#           User=root
+#           WorkingDirectory=/opt/sayhello-node-ui
+#           Environment=NODE_ENV=production
+
+#           [Install]
+#           WantedBy=multi-user.target
+#           UNIT
+
+#           sudo systemctl daemon-reload
+#           sudo systemctl enable --now sayhello-node-ui.service
+
+#           if command -v ufw >/dev/null 2>&1; then
+#             sudo ufw allow 80/tcp || true
+#           fi
+
+#           sleep 2
+#           curl -fsS http://localhost/sayHello | grep -q '"Hello User"'
+#           EOF

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SayHello — Demo</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container">
+    <section class="card">
+      <h1>SayHello Demo</h1>
+      <p class="lead">A tiny Node.js API with a friendly UI. Click the button to call <code>/sayHello</code>.</p>
+      <div class="controls">
+        <button id="callBtn">Call /sayHello</button>
+        <button id="curlBtn">Show curl</button>
+      </div>
+      <div id="result" class="result">Result will appear here...</div>
+      <div class="footer">Running on <strong>port 80</strong>. API: <code>/sayHello</code></div>
+    </section>
+    <aside class="info">
+      <h3>How it works</h3>
+      <ol>
+        <li>Express serves the static UI from <code>/public</code>.</li>
+        <li>Click the button to `fetch('/sayHello')`.</li>
+        <li>Deployment uses GitHub Actions → rsync → systemd on the VM.</li>
+      </ol>
+    </aside>
+  </main>
+
+<script>
+  const callBtn = document.getElementById("callBtn");
+  const curlBtn = document.getElementById("curlBtn");
+  const result = document.getElementById("result");
+
+  // Detect if running on Live Server (5500) → then target Express on port 80
+  const apiBase = window.location.port === "5500"
+    ? "http://localhost:80"
+    : "";
+
+  async function callApi() {
+    result.textContent = "Calling /sayHello ...";
+    try {
+      const r = await fetch(apiBase + "/sayHello");
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      result.innerHTML = "<pre>" + JSON.stringify(j, null, 2) + "</pre>";
+    } catch (e) {
+      result.textContent = "Error: " + e.message;
+    }
+  }
+
+  callBtn.addEventListener("click", callApi);
+  curlBtn.addEventListener("click", () => {
+    const text = `curl ${apiBase || window.location.origin}/sayHello`;
+    alert(text);
+  });
+</script>
+</body>
+</html>
