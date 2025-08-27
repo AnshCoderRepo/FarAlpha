@@ -1,4 +1,4 @@
-# SayHello Node.js + UI (Starter)
+# SayHello Node.js + UI (Starter)(Index.html +Style.css)
 
 Minimal Node.js (Express) API with a small demo UI.
 - Route: `/sayHello` -> `{"message":"Hello User"}`
@@ -10,17 +10,17 @@ Minimal Node.js (Express) API with a small demo UI.
 ```bash
 npm install
 # Running on port 80 requires elevated privileges. Use sudo for local test:
-sudo npm start
+npm run start
 # Then open http://localhost/ in your browser
 ```
 
 ## Deploy (high-level)
-1. Create a **private** GitHub repo and push this project.
-2. Add GitHub Secrets:
+1. Created a **private** GitHub repo and pushed this project.
+2. Added GitHub Secrets:
    - `VM_HOST="Give your host"`
    - `VM_USER="Give User "`
-   - `VM_SSH_KEY=<private ssh key contents>`
-3. Push to `main` — Actions will rsync the project to the VM and install/start a `systemd` service.
+   - `SSH_PRIVATE_KEY=<private ssh key contents>`
+3. Pushed to `main` — Actions will rsync the project to the VM and install/start a `systemd` service.
 4. Test from any machine: `curl Avaliable`
 
 ## Submission
