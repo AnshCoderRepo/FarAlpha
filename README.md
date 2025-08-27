@@ -10,7 +10,8 @@ Minimal Node.js (Express) API with a small demo UI.
 ```bash
 npm install express ,cors, dotenv
 # Running on port 80 requires elevated privileges. Use sudo for local test:
-npm run start-> for frontend
+npm run start-> for frontend 
+can use any one
 node server.js -> for backend
 # Then open http://localhost/ in your browser
 ```
