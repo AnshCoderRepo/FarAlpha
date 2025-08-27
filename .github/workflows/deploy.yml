@@ -102,20 +102,21 @@ jobs:
 
         # Install pm2 if missing
         if ! command -v pm2 &> /dev/null; then
+          echo "⚡ Installing PM2 globally..."
           sudo npm install -g pm2
-          sudo pm2 startup systemd -u $USER --hp $HOME
+          pm2 update
+          # Use current user instead of hardcoding $USER
+          pm2 startup systemd -u $(whoami) --hp $HOME || true
         fi
-
+        
         # Start or reload app with pm2 (zero-downtime)
-        pm2 describe backend-api > /dev/null 2>&1
-        if [ $? -eq 0 ]; then
-          pm2 reload backend-api --update-env
+        if pm2 describe backend-api > /dev/null 2>&1; then
+          pm2 reload backend-api --update-env || true
         else
-          pm2 start server.js --name backend-api --update-env
+          pm2 start server.js --name backend-api --update-env || true
         fi
-
-        # Save process list
-        pm2 save
+        
+        pm2 save || true
         EOF
 
     - name: Verify deployment
