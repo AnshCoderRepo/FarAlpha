@@ -21,7 +21,7 @@ npm run start
    - `VM_USER="Give User "`
    - `SSH_PRIVATE_KEY=<private ssh key contents>`
 3. Pushed to `main` — Actions will rsync the project to the VM and install/start a `systemd` service.
-4. Test from any machine: `curl Avaliable`
+4. Test from any machine: `curl process.env.Avaliable`
 
 ## Submission
 Fill `SUBMISSION.md` with your private repo link, exported ZIP, and notes.
