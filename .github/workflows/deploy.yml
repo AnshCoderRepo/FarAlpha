@@ -68,136 +68,55 @@ jobs:
         VM_HOST: ${{ secrets.VM_HOST }}
         VM_USER: ${{ secrets.VM_USER }}
       run: |
-        # Create SSH directory and set permissions
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
-        
-        # Save and format the private key with proper line breaks
         echo "$SSH_PRIVATE_KEY" | fold -w 64 > ~/.ssh/id_rsa.tmp
-        
-        # Ensure proper headers/footers
-        if ! head -1 ~/.ssh/id_rsa.tmp | grep -q "BEGIN"; then
-          sed -i '1i -----BEGIN RSA PRIVATE KEY-----' ~/.ssh/id_rsa.tmp
-        fi
-        if ! tail -1 ~/.ssh/id_rsa.tmp | grep -q "END"; then
-          echo "-----END RSA PRIVATE KEY-----" >> ~/.ssh/id_rsa.tmp
-        fi
-        
-        # Finalize the key file
         mv ~/.ssh/id_rsa.tmp ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        
-        # Debug: Check key format
-        echo "Key format check:"
-        head -2 ~/.ssh/id_rsa
-        echo "..."
-        tail -2 ~/.ssh/id_rsa
-        
-        # Add VM host to known hosts
         ssh-keyscan -H "$VM_HOST" >> ~/.ssh/known_hosts
         chmod 644 ~/.ssh/known_hosts
         
-        # Test SSH connection with verbose output for debugging
-        echo "Testing SSH connection to $VM_HOST..."
-        if ssh -v -i ~/.ssh/id_rsa \
-               -o BatchMode=yes \
-               -o ConnectTimeout=10 \
-               -o StrictHostKeyChecking=no \
-               "$VM_USER@$VM_HOST" "echo '✅ SSH connection successful!'"; then
-          echo "✅ SSH connection test passed"
-        else
-          echo "❌ SSH connection test failed"
-          echo "Troubleshooting:"
-          echo "1. Check SSH key format"
-          echo "2. Verify public key is in VM's authorized_keys"
-          echo "3. Check VM connectivity"
-          exit 1
-        fi
-
-    - name: Deploy to VM
-      env:
-        VM_HOST: ${{ secrets.VM_HOST }}
-        VM_USER: ${{ secrets.VM_USER }}
-      run: |
-        # Create temporary directory on VM
-        ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" "mkdir -p /tmp/deploy-backend-api"
-        
-        # Copy files to VM (exclude unnecessary files)
-        echo "Uploading files to VM..."
-        rsync -avz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
-          --exclude=.git \
-          --exclude=.github \
-          --exclude=node_modules \
-          --exclude=*.log \
-          ./ "$VM_USER@$VM_HOST:/tmp/deploy-backend-api/"
-        
-        echo "✅ Files uploaded successfully"
-
+        echo "Testing SSH connection..."
+        ssh -i ~/.ssh/id_rsa \
+            -o BatchMode=yes \
+            -o ConnectTimeout=10 \
+            -o StrictHostKeyChecking=no \
+            "$VM_USER@$VM_HOST" "echo '✅ SSH connection successful!'"
+            
     - name: Setup application on VM
       env:
         VM_HOST: ${{ secrets.VM_HOST }}
         VM_USER: ${{ secrets.VM_USER }}
       run: |
         ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" 'bash -s' << 'EOF'
-        set -e  # Exit on error
-        # Install Node.js if not already installed
-        if ! command -v node &> /dev/null; then
-          echo "Installing Node.js..."
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-          sudo apt-get install -y nodejs
-        fi
-        # Verify Node.js and npm installation
-        echo "Node.js version: $(node --version)"
-        echo "npm version: $(npm --version)"  
+        set -e
 
-        # Create application directory
         APP_DIR="/opt/backend-api"
         sudo mkdir -p "$APP_DIR"
         sudo chown -R $USER:$USER "$APP_DIR"
-        
-        # Copy files from temp to app directory
+
         cp -r /tmp/deploy-backend-api/* "$APP_DIR/"
         cd "$APP_DIR"
-        
-        # Install production dependencies
+
         npm install --production
-        
-        # Setup application to run on port 80
-        echo "Setting up application..."
-        
-        # Allow Node.js to bind to port 80 without root
-        sudo setcap 'cap_net_bind_service=+ep' $(which node) 2>/dev/null || true
-        
-        # Create or update systemd service (using server.js, not app.js)
-        sudo tee /etc/systemd/system/backend-api.service > /dev/null << SERVICE
-        [Unit]
-        Description=Backend API Service
-        After=network.target
-        
-        [Service]
-        Type=simple
-        User=$USER
-        WorkingDirectory=$APP_DIR
-        Environment=NODE_ENV=production
-        ExecStart=/usr/bin/node $APP_DIR/server.js
-        Restart=always
-        RestartSec=3
-  
-        [Install]
-        WantedBy=multi-user.target
-        SERVICE
-        
-        # Reload systemd and enable service
-        sudo systemctl daemon-reload
-        sudo systemctl enable backend-api.service
-        sudo systemctl restart backend-api.service
-        
-        # Ensure firewall allows port 80
-        if command -v ufw >/dev/null 2>&1; then
-          sudo ufw allow 80/tcp 2>/dev/null || true
+
+        # Install pm2 if missing
+        if ! command -v pm2 &> /dev/null; then
+          echo "⚡ Installing PM2 globally..."
+          sudo npm install -g pm2
+          pm2 update
+          # Use current user instead of hardcoding $USER
+          pm2 startup systemd -u $(whoami) --hp $HOME || true
         fi
         
-        echo "✅ Application setup completed"
+        # Start or reload app with pm2 (zero-downtime)
+        if pm2 describe backend-api > /dev/null 2>&1; then
+          pm2 reload backend-api --update-env || true
+        else
+          pm2 start server.js --name backend-api --update-env || true
+        fi
+        
+        pm2 save || true
         EOF
 
     - name: Verify deployment
@@ -206,17 +125,13 @@ jobs:
         VM_USER: ${{ secrets.VM_USER }}
       run: |
         echo "Waiting for application to start..."
-        sleep 20
-        
-        # Test the API endpoint
+        sleep 15
+
         if curl -f -s -S --retry 3 --retry-delay 2 "http://$VM_HOST:80/sayHello"; then
           echo "✅ Deployment verified successfully!"
         else
           echo "❌ Deployment verification failed"
-          echo "Checking service status..."
-          ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" "sudo systemctl status backend-api.service --no-pager"
-          echo "Checking if port 80 is listening..."
-          ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" "sudo lsof -i -P -n | grep LISTEN | grep ':80' || echo '⚠️ Nothing listening on port 80'"
+          ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" "pm2 logs backend-api --lines 20"
           exit 1
         fi
 

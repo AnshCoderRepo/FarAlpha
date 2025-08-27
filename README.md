@@ -8,7 +8,7 @@ Minimal Node.js (Express) API with a small demo UI.
 
 ## Quick local test (recommended)
 ```bash
-npm install
+npm install express ,cors, dotenv
 # Running on port 80 requires elevated privileges. Use sudo for local test:
 npm run start-> for frontend 
 can use any one
@@ -23,7 +23,7 @@ node server.js -> for backend
    - `VM_USER="Give User "`
    - `SSH_PRIVATE_KEY=<private ssh key contents>`
 3. Pushed to `main` — Actions will rsync the project to the VM and install/start a `systemd` service.
-4. Test from any machine: `curl Avaliable`
+4. Test from any machine: `curl process.env.Avaliable`
 
 ## Submission
 Fill `SUBMISSION.md` with your private repo link, exported ZIP, and notes.
