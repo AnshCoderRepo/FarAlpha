@@ -203,17 +203,20 @@ jobs:
     - name: Verify deployment
       env:
         VM_HOST: ${{ secrets.VM_HOST }}
+        VM_USER: ${{ secrets.VM_USER }}
       run: |
         echo "Waiting for application to start..."
-        sleep 5
+        sleep 20
         
         # Test the API endpoint
-        if curl -f -s -S --retry 3 --retry-delay 2 "http://$VM_HOST/sayHello"; then
+        if curl -f -s -S --retry 3 --retry-delay 2 "http://$VM_HOST:80/sayHello"; then
           echo "✅ Deployment verified successfully!"
         else
           echo "❌ Deployment verification failed"
           echo "Checking service status..."
           ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" "sudo systemctl status backend-api.service --no-pager"
+          echo "Checking if port 80 is listening..."
+          ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" "sudo lsof -i -P -n | grep LISTEN | grep ':80' || echo '⚠️ Nothing listening on port 80'"
           exit 1
         fi
 
