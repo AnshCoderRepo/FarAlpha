@@ -64,6 +64,7 @@ npm install express, cors ,dotenv
 ```bash
 # Start the application
 node server.js -> for backend
+can use any one
 npm run start  -> for frontend
 
 
