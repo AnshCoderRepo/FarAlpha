@@ -57,13 +57,15 @@ This project demonstrates a minimal Node.js API with an integrated web UI. It sh
 cd sayhello_node_ui_starter
 
 # Install all required packages
-npm install
+npm install express, cors ,dotenv
 ```
 
 #### Step 2: Start the Server
 ```bash
 # Start the application
-npm run start
+node server.js -> for backend
+npm run start  -> for frontend
+
 
 # Note: Port 80 requires elevated privileges on Windows
 # If you get permission errors, run PowerShell as Administrator

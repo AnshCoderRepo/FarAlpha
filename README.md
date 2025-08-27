@@ -10,7 +10,8 @@ Minimal Node.js (Express) API with a small demo UI.
 ```bash
 npm install
 # Running on port 80 requires elevated privileges. Use sudo for local test:
-npm run start
+npm run start-> for frontend
+node server.js -> for backend
 # Then open http://localhost/ in your browser
 ```
 
