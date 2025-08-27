@@ -34,9 +34,9 @@ jobs:
 
     - name: Verify production readiness
       run: |
-        # Check if main application file exists (only server.js)
+        # Check if main application file exists
         if [ ! -f "server.js" ]; then
-          echo "❌ No main application file found (server.js)"
+          echo "❌ No main application file found (app.js)"
           exit 1
         fi
         
@@ -72,20 +72,45 @@ jobs:
         mkdir -p ~/.ssh
         chmod 700 ~/.ssh
         
-        # Save private key
-        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        # Save and format the private key with proper line breaks
+        echo "$SSH_PRIVATE_KEY" | fold -w 64 > ~/.ssh/id_rsa.tmp
+        
+        # Ensure proper headers/footers
+        if ! head -1 ~/.ssh/id_rsa.tmp | grep -q "BEGIN"; then
+          sed -i '1i -----BEGIN RSA PRIVATE KEY-----' ~/.ssh/id_rsa.tmp
+        fi
+        if ! tail -1 ~/.ssh/id_rsa.tmp | grep -q "END"; then
+          echo "-----END RSA PRIVATE KEY-----" >> ~/.ssh/id_rsa.tmp
+        fi
+        
+        # Finalize the key file
+        mv ~/.ssh/id_rsa.tmp ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
+        
+        # Debug: Check key format
+        echo "Key format check:"
+        head -2 ~/.ssh/id_rsa
+        echo "..."
+        tail -2 ~/.ssh/id_rsa
         
         # Add VM host to known hosts
         ssh-keyscan -H "$VM_HOST" >> ~/.ssh/known_hosts
         chmod 644 ~/.ssh/known_hosts
         
-        # Test SSH connection
+        # Test SSH connection with verbose output for debugging
         echo "Testing SSH connection to $VM_HOST..."
-        if ssh -i ~/.ssh/id_rsa -o BatchMode=yes -o ConnectTimeout=5 "$VM_USER@$VM_HOST" "echo 'SSH connection successful!'"; then
+        if ssh -v -i ~/.ssh/id_rsa \
+               -o BatchMode=yes \
+               -o ConnectTimeout=10 \
+               -o StrictHostKeyChecking=no \
+               "$VM_USER@$VM_HOST" "echo '✅ SSH connection successful!'"; then
           echo "✅ SSH connection test passed"
         else
           echo "❌ SSH connection test failed"
+          echo "Troubleshooting:"
+          echo "1. Check SSH key format"
+          echo "2. Verify public key is in VM's authorized_keys"
+          echo "3. Check VM connectivity"
           exit 1
         fi
 
@@ -134,7 +159,7 @@ jobs:
         # Allow Node.js to bind to port 80 without root
         sudo setcap 'cap_net_bind_service=+ep' $(which node) 2>/dev/null || true
         
-        # Create or update systemd service
+        # Create or update systemd service (using app.js, not server.js)
         sudo tee /etc/systemd/system/backend-api.service > /dev/null << SERVICE
         [Unit]
         Description=Backend API Service
