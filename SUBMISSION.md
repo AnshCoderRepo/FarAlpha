@@ -131,7 +131,7 @@ npm run start
 - **Solution**: Smart port detection in JavaScript
 - **Implementation**: Automatically detects port 5500 and adjusts API base URL
 ### 3. **Github Action**
-- **Challenge**: I never user used Github Actions so it was my biggest challenge to make a ci/cd pipline
+- **Challenge**: I never user used Github Actions so it was my biggest challenge to make a ci/cd pipeline
 - **Solution**: I learned it from  youtube and  tried to implement it using gpt and fixed bugs by myself after hours of debugging it  worked and finally pushed it. It was the most difficult part for me to solve..
 
 ---
