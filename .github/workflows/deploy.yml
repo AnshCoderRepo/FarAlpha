@@ -82,51 +82,31 @@ jobs:
             -o ConnectTimeout=10 \
             -o StrictHostKeyChecking=no \
             "$VM_USER@$VM_HOST" "echo '✅ SSH connection successful!'"
-
-    - name: Deploy to VM (PM2 Zero-Downtime)
+            
+    - name: Setup application on VM
       env:
         VM_HOST: ${{ secrets.VM_HOST }}
         VM_USER: ${{ secrets.VM_USER }}
       run: |
-        # Create temporary directory on VM
-        ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" "mkdir -p /tmp/deploy-backend-api"
-        
-        # Copy files to VM
-        rsync -avz -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
-          --exclude=.git \
-          --exclude=.github \
-          --exclude=node_modules \
-          --exclude=*.log \
-          ./ "$VM_USER@$VM_HOST:/tmp/deploy-backend-api/"
-        
-        echo "✅ Files uploaded successfully"
-
-        # Setup and reload app with PM2
         ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" 'bash -s' << 'EOF'
         set -e
-        APP_DIR="/opt/backend-api"
-        
-        # Install Node.js if missing
-        if ! command -v node &> /dev/null; then
-          curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-          sudo apt-get install -y nodejs
-        fi
-        
-        # Install PM2 if missing
-        if ! command -v pm2 &> /dev/null; then
-          sudo npm install -g pm2
-          sudo pm2 startup systemd -u $USER --hp $HOME
-        fi
 
-        # Move files into app directory
+        APP_DIR="/opt/backend-api"
         sudo mkdir -p "$APP_DIR"
         sudo chown -R $USER:$USER "$APP_DIR"
+
         cp -r /tmp/deploy-backend-api/* "$APP_DIR/"
         cd "$APP_DIR"
 
         npm install --production
 
-        echo "🚀 Starting or reloading app with PM2..."
+        # Install pm2 if missing
+        if ! command -v pm2 &> /dev/null; then
+          sudo npm install -g pm2
+          sudo pm2 startup systemd -u $USER --hp $HOME
+        fi
+
+        # Start or reload app with pm2 (zero-downtime)
         pm2 describe backend-api > /dev/null 2>&1
         if [ $? -eq 0 ]; then
           pm2 reload backend-api --update-env
@@ -134,6 +114,7 @@ jobs:
           pm2 start server.js --name backend-api --update-env
         fi
 
+        # Save process list
         pm2 save
         EOF
 
