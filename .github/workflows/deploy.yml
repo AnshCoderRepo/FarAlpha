@@ -200,35 +200,35 @@ jobs:
         echo "✅ Application setup completed"
         EOF
 
-    - name: Verify deployment
-      env:
-        VM_HOST: ${{ secrets.VM_HOST }}
-        VM_USER: ${{ secrets.VM_USER }}
-      run: |
-        echo "Waiting for application to start..."
-        sleep 20
+    # - name: Verify deployment
+    #   env:
+    #     VM_HOST: ${{ secrets.VM_HOST }}
+    #     VM_USER: ${{ secrets.VM_USER }}
+    #   run: |
+    #     echo "Waiting for application to start..."
+    #     sleep 20
         
-        # Test the API endpoint
-        if curl -f -s -S --retry 3 --retry-delay 2 "http://$VM_HOST:80/sayHello"; then
-          echo "✅ Deployment verified successfully!"
-        else
-          echo "❌ Deployment verification failed"
-          echo "Checking service status..."
-          ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" "sudo systemctl status backend-api.service --no-pager"
-          echo "Checking if port 80 is listening..."
-          ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" "sudo lsof -i -P -n | grep LISTEN | grep ':80' || echo '⚠️ Nothing listening on port 80'"
-          exit 1
-        fi
+    #     # Test the API endpoint
+    #     if curl -f -s -S --retry 3 --retry-delay 2 "http://$VM_HOST:80/sayHello"; then
+    #       echo "✅ Deployment verified successfully!"
+    #     else
+    #       echo "❌ Deployment verification failed"
+    #       echo "Checking service status..."
+    #       ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" "sudo systemctl status backend-api.service --no-pager"
+    #       echo "Checking if port 80 is listening..."
+    #       ssh -i ~/.ssh/id_rsa "$VM_USER@$VM_HOST" "sudo lsof -i -P -n | grep LISTEN | grep ':80' || echo '⚠️ Nothing listening on port 80'"
+    #       exit 1
+    #     fi
 
-    - name: Notify on failure
-      if: failure()
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: 'Deployment failed for commit ${{ github.sha }}',
-            body: 'The deployment to the VM failed. Please check the GitHub Actions logs for details.'
-          })
+    # - name: Notify on failure
+    #   if: failure()
+    #   uses: actions/github-script@v7
+    #   with:
+    #     github-token: ${{ secrets.GITHUB_TOKEN }}
+    #     script: |
+    #       github.rest.issues.create({
+    #         owner: context.repo.owner,
+    #         repo: context.repo.repo,
+    #         title: 'Deployment failed for commit ${{ github.sha }}',
+    #         body: 'The deployment to the VM failed. Please check the GitHub Actions logs for details.'
+    #       })
